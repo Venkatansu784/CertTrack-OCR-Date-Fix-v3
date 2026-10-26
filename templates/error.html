@@ -1,0 +1,5 @@
+{% extends 'base.html' %}
+{% block title %}{{ code }} · Request error{% endblock %}
+{% block breadcrumb %}Request error{% endblock %}
+{% block content %}{% if current_user %}<section class="panel error-panel"><div class="error-code">{{ code }}</div><h1>That didn't work.</h1><p>{{ message }}</p><a href="{{ url_for('dashboard') }}" class="btn btn-primary">Return to overview →</a></section>{% endif %}{% endblock %}
+{% block auth_content %}{% if not current_user %}<div class="login-card"><div class="eyebrow muted-eyebrow">REQUEST ERROR</div><div class="error-code">{{ code }}</div><h2>That didn't work.</h2><p>{{ message }}</p><a href="{{ url_for('login') }}" class="btn btn-primary btn-wide">Return to sign in →</a></div>{% endif %}{% endblock %}

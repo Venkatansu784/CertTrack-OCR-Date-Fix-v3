@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+<div class="login-layout">
+  <section class="login-visual">
+    <div class="login-logo"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 3.75h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5.25A1.5 1.5 0 0 1 7.5 3.75Z"/><path d="M14 4v4h4M8.5 13h7M8.5 16.5h5M8.5 9.5h2"/></svg></span>Cert<span class="brand-accent">Track</span></div>
+    <div class="visual-copy"><div class="eyebrow"><span class="green-dot"></span> COMPLIANCE, WITHOUT THE CHAOS</div><h1>Every credential.<br><em>Under control.</em></h1><p>One clear view of employee certifications, renewal deadlines, and compliance status.</p></div>
+    <div class="visual-stat-row"><div><strong>01</strong><span>Centralized records</span></div><div><strong>02</strong><span>OCR-assisted entry</span></div><div><strong>03</strong><span>Expiry visibility</span></div></div>
+    <div class="visual-grid"></div>
+  </section>
+  <section class="login-form-side"><div class="login-card"><div class="mobile-brand">Cert<span class="brand-accent">Track</span></div><div class="eyebrow muted-eyebrow">WELCOME BACK</div><h2>Sign in to your workspace</h2><p class="subtle">Enter your account details to continue.</p>
+    <form method="post" class="form-stack"><input type="hidden" name="_csrf_token" value="{{ csrf_token }}"><label>Email / username<input name="username" type="text" placeholder="you@company.com" autocomplete="username" required autofocus></label><label>Password<input name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required></label><button class="btn btn-primary btn-wide" type="submit">Sign in <span>→</span></button></form>
+    {% if show_demo_logins %}<div class="demo-login"><div class="demo-title">DEMO ACCESS <span>LOCAL DEVELOPMENT</span></div><div class="demo-row"><span>Admin</span><code>admin@certtrack.local</code><button type="button" data-fill-user="admin@certtrack.local" data-fill-password="Admin@123">Use</button></div><div class="demo-row"><span>HR staff</span><code>hr@certtrack.local</code><button type="button" data-fill-user="hr@certtrack.local" data-fill-password="HR@123">Use</button></div><div class="demo-row"><span>Manager</span><code>manager@certtrack.local</code><button type="button" data-fill-user="manager@certtrack.local" data-fill-password="Manager@123">Use</button></div></div>{% endif %}
+    <p class="login-register-link">New to CertTrack? <a href="{{ url_for('register') }}">Create an account</a></p>
+    <p class="login-foot"><span class="lock-icon">▣</span> Protected workspace · Role-based access and audit history</p>
+  </div></section>
+</div>
+{% endblock %}

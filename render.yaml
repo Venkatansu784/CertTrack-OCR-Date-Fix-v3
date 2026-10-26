@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: certtrack-workspace
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: INITIAL_ADMIN_USERNAME
+        sync: false
+      - key: INITIAL_ADMIN_PASSWORD
+        sync: false
+      - key: INITIAL_ADMIN_FIRST_NAME
+        value: Workspace
+      - key: INITIAL_ADMIN_LAST_NAME
+        value: Admin
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: SHOW_DEMO_LOGINS
+        value: "0"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: certificates
+      - key: SESSION_HOURS
+        value: "8"

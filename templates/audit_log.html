@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Audit log{% endblock %}
+{% block breadcrumb %}Audit log{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow muted-eyebrow">ADMINISTRATION</div><h1>System audit log</h1><p>Recent account and record actions for audit visibility.</p></div></div><section class="panel list-panel"><div class="table-wrap"><table><thead><tr><th>TIMESTAMP</th><th>USER</th><th>ENTITY</th><th>ACTION</th><th>DETAILS</th></tr></thead><tbody>{% for log in logs %}<tr><td>{{ log.action_timestamp }}</td><td>{{ log.username or 'System' }}</td><td>{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</td><td><span class="action-chip">{{ log.action_type }}</span></td><td>{{ log.details }}</td></tr>{% else %}<tr><td colspan="5">No audit events found.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

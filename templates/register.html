@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Create account{% endblock %}
+{% block auth_content %}
+<div class="login-layout">
+  <section class="login-visual">
+    <div class="login-logo"><span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M7 3.75h7l4 4V20a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 6 20V5.25A1.5 1.5 0 0 1 7.5 3.75Z"/><path d="M14 4v4h4M8.5 13h7M8.5 16.5h5M8.5 9.5h2"/></svg></span>Cert<span class="brand-accent">Track</span></div>
+    <div class="visual-copy"><div class="eyebrow"><span class="green-dot"></span> SECURE REGISTRATION</div><h1>Your work.<br><em>One trusted place.</em></h1><p>Request access to your organization's certification and compliance workspace. An administrator will review your details before your account is activated.</p></div>
+    <div class="visual-stat-row"><div><strong>01</strong><span>Submit your details</span></div><div><strong>02</strong><span>Admin review</span></div><div><strong>03</strong><span>Secure access</span></div></div>
+    <div class="visual-grid"></div>
+  </section>
+  <section class="login-form-side"><div class="login-card register-card"><div class="mobile-brand">Cert<span class="brand-accent">Track</span></div><div class="eyebrow muted-eyebrow">REQUEST WORKSPACE ACCESS</div><h2>Create your account</h2><p class="subtle">Your account stays pending until an administrator approves it and assigns a role.</p>
+    <form method="post" class="form-stack"><input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+      <div class="register-name-row"><label>First name<input name="first_name" maxlength="80" autocomplete="given-name" required></label><label>Last name<input name="last_name" maxlength="80" autocomplete="family-name" required></label></div>
+      <label>Work email<input name="email" type="email" maxlength="180" autocomplete="email" placeholder="you@company.com" required></label>
+      <label>Username<input name="username" type="text" maxlength="180" autocomplete="username" placeholder="Choose a username" required></label>
+      <label>Department<select name="department_id" required><option value="">Choose your department...</option>{% for row in departments %}<option value="{{ row.department_id }}">{{ row.department_name }} · {{ row.location_name }}</option>{% endfor %}</select></label>
+      <label>Job title <span class="field-hint">(optional)</span><input name="job_role" maxlength="120" placeholder="e.g. Compliance Analyst"></label>
+      <label>Password<input name="password" type="password" minlength="10" autocomplete="new-password" placeholder="At least 10 characters" required></label>
+      <label>Confirm password<input name="confirm_password" type="password" minlength="10" autocomplete="new-password" placeholder="Enter the same password again" required></label>
+      <button class="btn btn-primary btn-wide" type="submit">Submit registration <span>→</span></button>
+    </form>
+    <p class="login-register-link">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+    <p class="login-foot"><span class="lock-icon">▣</span> Your password is hashed before storage. Access requires admin approval.</p>
+  </div></section>
+</div>
+{% endblock %}

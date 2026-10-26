@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Overview{% endblock %}
+{% block breadcrumb %}Overview{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow muted-eyebrow">COMPLIANCE OVERVIEW</div><h1>Welcome back, {{ current_user.first_name }}<span class="heading-period">.</span></h1><p>{% if current_user.role == 'Manager' %}Read-only compliance overview for {{ current_user.department_name }}. Review risks and upcoming renewals in your department.{% elif current_user.role == 'HR_Staff' %}Manage employee certificates, resolve expiry risks, and coordinate upcoming renewals.{% else %}Company-wide compliance overview, master data, user access, audit history, and renewal risks.{% endif %}</p></div>{% if can_manage %}<a class="btn btn-primary" href="{{ url_for('upload_certificate') }}"><span class="btn-plus">＋</span> Scan certificate</a>{% endif %}</div>
+<div class="metric-grid">
+  <div class="metric-card"><div class="metric-top"><span>Total records</span><span class="metric-icon blue">▤</span></div><div class="metric-value">{{ summary.total }}</div><div class="metric-foot"><span class="tiny-dot blue-dot"></span>Active certificate records</div></div>
+  <div class="metric-card"><div class="metric-top"><span>Valid</span><span class="metric-icon green">✓</span></div><div class="metric-value">{{ summary.valid }}</div><div class="metric-foot"><span class="tiny-dot green-dot"></span>More than 30 days remaining</div></div>
+  <div class="metric-card"><div class="metric-top"><span>Expiring soon</span><span class="metric-icon amber">◷</span></div><div class="metric-value">{{ summary.expiring }}</div><div class="metric-foot"><span class="tiny-dot amber-dot"></span>Due within 30 days</div></div>
+  <div class="metric-card"><div class="metric-top"><span>Expired</span><span class="metric-icon red">!</span></div><div class="metric-value">{{ summary.expired }}</div><div class="metric-foot"><span class="tiny-dot red-dot"></span>Renewal action required</div></div>
+</div>
+<div class="content-grid dashboard-grid">
+  <section class="panel panel-main"><div class="panel-heading"><div><h2>Certificate register</h2><p>Recent active records across your permitted scope</p></div><a class="text-link" href="{{ url_for('certificates') }}">View all <span>→</span></a></div>
+    <div class="table-wrap"><table><thead><tr><th>EMPLOYEE</th><th>CERTIFICATION</th><th>ISSUED</th><th>EXPIRY DATE</th><th>STATUS</th></tr></thead><tbody>
+      {% for row in records %}<tr><td><div class="employee-cell"><div class="table-avatar">{{ row.first_name[:1] }}{{ row.last_name[:1] }}</div><div><strong>{{ row.first_name }} {{ row.last_name }}</strong><small>{{ row.employee_code }} · {{ row.department_name }}</small></div></div></td><td><strong class="table-primary">{{ row.certification_title }}</strong><small class="table-secondary">{{ row.provider_name }}</small></td><td>{{ row.issue_date }}</td><td><span class="date-strong">{{ row.expiry_date }}</span></td><td><span class="status {% if row.expiry_date < today_iso %}status-expired{% elif (row.expiry_date|to_date - today_iso|to_date).days <= 30 %}status-expiring{% else %}status-valid{% endif %}">{% if row.expiry_date < today_iso %}Expired{% elif (row.expiry_date|to_date - today_iso|to_date).days <= 30 %}Expiring Soon{% else %}Valid{% endif %}</span></td></tr>
+      {% else %}<tr><td colspan="5"><div class="empty-state"><strong>No certificates yet</strong><span>Upload a certificate to start building your register.</span></div></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+  <aside class="panel renewal-panel"><div class="panel-heading"><div><h2>Renewal watch</h2><p>Certificates needing attention</p></div><span class="panel-count">{{ upcoming|length }}</span></div>
+    {% for item in upcoming %}<div class="renewal-item"><div class="renewal-mark amber">◷</div><div class="renewal-body"><strong>{{ item.certification_title }}</strong><span>{{ item.first_name }} {{ item.last_name }}</span><small>Expires {{ item.expiry_date }}</small></div><span class="renewal-arrow">↗</span></div>{% else %}<div class="empty-state compact"><div class="empty-check">✓</div><strong>All clear for now</strong><span>No certificates expiring in the next 30 days.</span></div>{% endfor %}
+    <a class="panel-bottom-link" href="{{ url_for('certificates', status='Expiring Soon') }}">Review expiring certificates <span>→</span></a>
+  </aside>
+</div>
+<section class="panel reminder-panel"><div class="panel-heading"><div><h2>Reminder schedule</h2><p>In-app alerts trigger at 30, 7 and 1 day before expiry</p></div><a class="text-link" href="{{ url_for('reminders') }}">Open reminder hub →</a></div><div class="reminder-list">
+{% for reminder in reminders %}<div class="reminder-row"><div class="reminder-icon">♧</div><div class="reminder-copy"><strong>{{ reminder.certification_title }}</strong><span>{{ reminder.first_name }} {{ reminder.last_name }} · Expiry {{ reminder.expiry_date }}</span></div><span class="reminder-date">{{ reminder.reminder_state or ('Due now' if reminder.scheduled_date <= today_iso else 'Scheduled') }} · {{ reminder.scheduled_date }}</span><span class="status status-pending">Pending</span></div>{% else %}<div class="empty-line">No pending reminders in the current view.</div>{% endfor %}
+</div></section>
+<div class="dashboard-bottom-note"><span class="note-icon">i</span><span><strong>How status works</strong> A certificate is marked <b>Expiring Soon</b> when its expiry date is within 30 days. Dates are recalculated whenever the dashboard loads.</span><a href="{{ url_for('reports') }}">Open compliance report →</a></div>
+{% endblock %}
