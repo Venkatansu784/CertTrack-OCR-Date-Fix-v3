@@ -188,11 +188,23 @@ class HybridRow(dict):
         return super().__getitem__(key)
 
 
+
+
 def hybrid_row_factory(cursor):
-    columns = [column.name for column in cursor.description]
     def build_row(values):
+        description = cursor.description
+
+        if description is None:
+            return values
+
+        columns = [column.name for column in description]
         return HybridRow(zip(columns, values))
+
     return build_row
+
+
+
+
 
 
 def translate_postgres_sql(sql: str) -> tuple[str, bool]:
