@@ -26,7 +26,7 @@ from flask import (
     request, send_file, send_from_directory, session, url_for,
 )
 from PIL import Image, ImageFilter, ImageOps, UnidentifiedImageError
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash as _werkzeug_generate_password_hash
 from werkzeug.utils import secure_filename
 import requests
 from dotenv import load_dotenv
@@ -37,6 +37,12 @@ try:
 except ImportError:  # Optional until a PostgreSQL/Supabase DATABASE_URL is configured.
     psycopg = None
     psycopg_errors = None
+
+def generate_password_hash(password):
+    return _werkzeug_generate_password_hash(
+        password, method="pbkdf2:sha256"
+    )
+
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -799,18 +805,28 @@ def date_near_label(text: str, label_regex: re.Pattern) -> date | None:
             # Check the immediately preceding line first; if there is no date there,
             # look at the following lines (common in form-style PDFs).
             for distance in (1, 2):
-                if i - distance >= 0:
-                    tokens = list(DATE_TOKEN.finditer(lines[i - distance]))
-                    if tokens:
-                        parsed = parse_certificate_date(tokens[-1].group(0), end_of_month=(label_regex is EXPIRY_LABEL))
-                        if parsed and 1980 <= parsed.year <= 2100:
-                            return parsed
-                if i + distance < len(lines):
-                    tokens = list(DATE_TOKEN.finditer(lines[i + distance]))
-                    if tokens:
-                        parsed = parse_certificate_date(tokens[0].group(0), end_of_month=(label_regex is EXPIRY_LABEL))
-                        if parsed and 1980 <= parsed.year <= 2100:
-                            return parsed
+                # For expiry labels, prefer a date following the label.
+                # For issue labels, preserve the original preceding-first behavior.
+                directions = (
+                    (i + distance, True, i - distance, False)
+                    if label_regex is EXPIRY_LABEL
+                    else (i - distance, False, i + distance, True)
+                )
+                first_index, first_token, second_index, second_token = directions
+                for line_index, token_index in (
+                    (first_index, first_token),
+                    (second_index, second_token),
+                ):
+                    if 0 <= line_index < len(lines):
+                        tokens = list(DATE_TOKEN.finditer(lines[line_index]))
+                        if tokens:
+                            token = tokens[0] if token_index else tokens[-1]
+                            parsed = parse_certificate_date(
+                                token.group(0),
+                                end_of_month=(label_regex is EXPIRY_LABEL),
+                            )
+                            if parsed and 1980 <= parsed.year <= 2100:
+                                return parsed
 
     # PDF text layers sometimes collapse positions into a long line. Search the
     # nearest preceding date before looking forward so a caption below its date
@@ -1082,53 +1098,102 @@ def ocr_file(path: Path) -> str:
 
 
 def run_tesseract(image: Image.Image) -> str:
-    """OCR with several page layouts/preprocessing variants and keep the strongest read.
-
-    Small certificates often have faint caption text under dates. A single PSM 6
-    pass may read the larger date but miss its label or the earlier issue date, so
-    try alternate layouts and score results by distinct dates and date labels.
-    """
+    """Run OCR using a limited number of configurations and per-pass timeouts."""
     try:
         gray = ImageOps.autocontrast(ImageOps.grayscale(image))
+
+        # Upscale small certificate images to improve recognition of fine date labels.
         if gray.width < 1800:
             ratio = 1800 / max(gray.width, 1)
-            gray = gray.resize((1800, max(1, int(gray.height * ratio))), Image.Resampling.LANCZOS)
+            gray = gray.resize(
+                (1800, max(1, int(gray.height * ratio))),
+                Image.Resampling.LANCZOS,
+            )
 
-        # Certificates often use separate columns/labels (especially dates). Keep
-        # grayscale and global-threshold passes, and add a sharpened pass for small
-        # scans. PSM 11/12 detect scattered text blocks better than PSM 6 alone.
         threshold = gray.point(lambda px: 255 if px >= 175 else 0)
-        sharpened = gray.filter(ImageFilter.UnsharpMask(radius=2, percent=160, threshold=3))
+        sharpened = gray.filter(
+            ImageFilter.UnsharpMask(radius=2, percent=160, threshold=3)
+        )
+
         candidates: list[tuple[float, str]] = []
-        for image_variant in (gray, sharpened, threshold):
-            for psm in (11, 12, 6, 4, 3):
+        configurations = [
+            (gray, 11),
+            (sharpened, 11),
+            (gray, 6),
+            (threshold, 11),
+            (threshold, 6),
+        ]
+
+        for image_variant, psm in configurations:
+            app.logger.info(
+                "Tesseract OCR started: PSM=%s, image=%sx%s",
+                psm,
+                image_variant.width,
+                image_variant.height,
+            )
+            try:
                 output = pytesseract.image_to_string(
-                    image_variant, config=f"--oem 3 --psm {psm}"
+                    image_variant,
+                    config=f"--oem 3 --psm {psm}",
+                    timeout=15,
                 ).strip()
-                if not output:
-                    continue
-                distinct_dates = {item[0] for item in dates_in(output)}
-                score = min(len(distinct_dates), 5) * 20
-                score += 12 if ISSUE_LABEL.search(output) else 0
-                score += 12 if EXPIRY_LABEL.search(output) else 0
-                score += min(len(re.findall(r"[A-Za-z]{3,}", output)), 40) * 0.15
-                # Reward readable date-label context; never assume that a partial
-                # year such as "20" is a complete expiry date.
-                score += min(len(re.findall(r"(?i)\b(?:certification\s+date|valid\s+till|valid\s+until|expiry\s+date|expiration\s+date)\b", output)), 3) * 5
-                candidates.append((score, output))
-                # If this pass contains both labels and at least two distinct
-                # dates, it is already strong enough; avoid unnecessary OCR runs.
-                if len(distinct_dates) >= 2 and ISSUE_LABEL.search(output) and EXPIRY_LABEL.search(output):
-                    return output
+            except RuntimeError:
+                app.logger.warning(
+                    "Tesseract OCR timed out for PSM=%s; trying the next configuration.",
+                    psm,
+                )
+                continue
+
+            if not output:
+                continue
+
+            distinct_dates = {item[0] for item in dates_in(output)}
+            score = min(len(distinct_dates), 5) * 20
+            score += 12 if ISSUE_LABEL.search(output) else 0
+            score += 12 if EXPIRY_LABEL.search(output) else 0
+            score += min(len(re.findall(r"[A-Za-z]{3,}", output)), 40) * 0.15
+            score += min(
+                len(
+                    re.findall(
+                        r"(?i)\b(?:certification\s+date|valid\s+till|valid\s+until|expiry\s+date|expiration\s+date)\b",
+                        output,
+                    )
+                ),
+                3,
+            ) * 5
+
+            candidates.append((score, output))
+            app.logger.info(
+                "Tesseract OCR pass completed: PSM=%s, distinct_dates=%s, score=%.2f",
+                psm,
+                len(distinct_dates),
+                score,
+            )
+
+            # Stop early only when both date labels and at least two distinct dates are found.
+            if (
+                len(distinct_dates) >= 2
+                and ISSUE_LABEL.search(output)
+                and EXPIRY_LABEL.search(output)
+            ):
+                return output
+
         if not candidates:
+            app.logger.warning("Tesseract OCR produced no usable text.")
             return ""
+
         return max(candidates, key=lambda item: item[0])[1]
+
     except pytesseract.TesseractNotFoundError as exc:
-        raise ValueError("Tesseract OCR was not found. Install Tesseract and add it to PATH, or set TESSERACT_CMD in your environment. See README.md.") from exc
+        raise ValueError(
+            "Tesseract OCR was not found. Install Tesseract and add it to PATH, "
+            "or set TESSERACT_CMD in your environment. See README.md."
+        ) from exc
     except pytesseract.TesseractError as exc:
-        raise ValueError("Tesseract could not read this file. Try a clearer scan or enter the details manually.") from exc
-
-
+        raise ValueError(
+            "Tesseract could not read this file. Try a clearer scan or enter "
+            "the certificate details manually."
+        ) from exc
 
 
 def persist_certificate_file(staged_path: Path, stored_key: str) -> str:

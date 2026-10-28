@@ -12,3 +12,4 @@ instance/staging/*
 .pytest_cache/
 .coverage
 *.log
+app.py.before-hash-fix
